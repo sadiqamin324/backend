@@ -73,8 +73,8 @@ web_modules/
 .env
 .env.test
 .env.production
-Notes.txt
-Notes_logic_building.txt
+ Notes.txt
+ Notes_logic_building.txt
 
 
 
