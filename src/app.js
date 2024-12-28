@@ -1,30 +1,26 @@
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
+import express from "express"
+import cors from "cors"
+import cookieParser from "cookie-parser"
 
-// Load environment variables
-dotenv.config();
+const app = express()
 
-const app = express();
-
-// Middleware
 app.use(cors({
-    origin: process.env.CORS_ORIGIN, // Use CORS origin from the .env file
-    credentials: true, // Allow credentials (cookies, etc.)
-}));
-app.use(express.json({ limit: "16kb" })); // Body parser for JSON with size limit
-app.use(express.urlencoded({ extended: true, limit: "16kb" })); // URL-encoded data parser
-app.use(express.static("public")); // Serve static files from 'public' directory
-app.use(cookieParser()); // Parse cookies
+    origin: process.env.CORS_ORIGIN,
+    credentials: true
+}))
 
-// Routes import
-import userRouter from './routes/user.routes.js';
+app.use(express.json({limit: "16kb"}))
+app.use(express.urlencoded({extended: true, limit: "16kb"}))
+app.use(express.static("public"))
+app.use(cookieParser())
 
-// Routes declaration
-app.use("/api/v1/users", userRouter); // Base route for user-related routes
+//routes import
+import userRouter from './routes/user.routes.js'
+//routes declare
+app.use("/api/v1/users", userRouter)
+// http://localhost:8000/api/v1/users/register
 
-// Error handling middleware
 
 
-export {app}
+
+export{app}
