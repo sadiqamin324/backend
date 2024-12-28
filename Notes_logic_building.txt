@@ -1,0 +1,26 @@
+V-12(Complete guide for router and controller with debugging)
+
+we are building logic for routes and debugging
+in controller folder we have user controller where we are writing logic(at the moment we have just send a ok massage in response)
+ab isi file ka route bhi bana diya "user.routes.js" jis mein hum url deinge jahan humne (/register)ke naam se url daala registerUser(jahan controller pe function likha hay) jab url hit hoga ye usko regiserUser controller se utha kar response dedega
+ab yehi url humay app,js per bhi dena hoga middleware ke through(app.use)--->agar hum controller wager usi app.js ke ander write karte to app/get use karte but humne separate file banaye jiske liye middleware ki need hogi app.use--->(app.use("api/v1/users",userRouter)) 1st per api/v1/users hit hogi then userRouterper jayega usko controller dega phir wahan last scenario hoga already explained
+NOTE:
+export default means  (export default router) jab bhi hum karte hay to means we can import with any our name like this (import userRouter from "./routes/user.routes.js";)
+and if we export with certain name without default then we need to import with that name
+
+
+
+
+V-12(Logic building | Register controller)
+Logic building(how to register a user)
+1st step get user details from frontend
+2nd validation is details are not empty
+3rd check if user is already exist(through username or email)
+4th check for images
+5th check for avatar
+6th now upload on cloudinary
+7th create user object-create entry in db mongo db mein no sql hay isiliye hum object bana kar data bhejienge
+8th remove pass and refresh token field from response(because we need to show all fields like email pass to frontend but not encypted thats why we are remiving token)
+9th check for user creation (check user create hwa hay nahi)
+10th if created return response else error
+req.body---se saari details mil jaingi(form ya jason) agar url se aye to uske different way
