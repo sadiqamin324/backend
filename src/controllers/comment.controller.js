@@ -1,74 +1,133 @@
-import mongoose from "mongoose";
-import Comment from "../models/comment.model.js";
+import mongoose, { Schema } from "mongoose";
+import { Video } from "../models/video.model.js";
+import { Like } from "../models/like.model.js";
+import { Comment } from "../models/comment.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { User } from "../models/user.model.js";
 
-// Get all comments for a video
-const getVideoComments = asyncHandler(async (req, res, next) => {
+const getVideoComments = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
     const { page = 1, limit = 10 } = req.query;
 
-    if (!mongoose.Types.ObjectId.isValid(videoId)) {
-        return next(new ApiError(400, 'Invalid video ID'));
+    const video = await Video.findById(videoId);
+    if (!video) {
+        throw new ApiError(404, "Video not found");
     }
 
-    const comments = await Comment.find({ post: videoId })
-        .populate('author')
-        .skip((page - 1) * limit)
-        .limit(parseInt(limit));
+    const comments = await Comment.aggregate([
+        { $match: { video: videoId?.toLowerCase() } },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner"
+            }
+        },
+        {
+            $lookup: {
+                from: "likes",
+                localField: "_id",
+                foreignField: "comment",
+                as: "likes"
+            }
+        },
+        {
+            $addFields: {
+                likesCount: { $size: "$likes" },
+                isLiked: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$likes.likedby"] },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                content: 1,
+                createdAt: 1,
+                likesCount: 1,
+                owner: {
+                    username: 1,
+                    fullName: 1,
+                    "avatar.url": 1
+                },
+                isLiked: 1
+            }
+        }
+    ]);
 
-    res.status(200).json(new ApiResponse(200, comments, 'Comments retrieved successfully'));
+    return res.status(200).json(new ApiResponse(200, comments, "Comments fetched successfully"));
 });
 
-// Add a comment to a video
-const addComment = asyncHandler(async (req, res, next) => {
-    const { text, author, post } = req.body;
+const addComment = asyncHandler(async (req, res) => {
+    const { videoID } = req.params;
+    const video = await Video.findById(videoID);
 
-    if (!text || !author || !post) {
-        return next(new ApiError(400, 'All fields are required'));
+    if (!video) {
+        throw new ApiError(400, "No video found");
     }
 
-    const comment = new Comment({ text, author, post });
-    await comment.save();
+    const { content } = req.body;
+    if (!content) {
+        throw new ApiError(400, "Content is required");
+    }
 
-    res.status(201).json(new ApiResponse(201, comment, 'Comment added successfully'));
+    const commentCreate = await Comment.create({
+        content,
+        video: videoID,
+        owner: req.user?._id
+    });
+
+    return res.status(201).json(new ApiResponse(201, commentCreate, "Comment created successfully"));
 });
 
-// Update a comment
-const updateComment = asyncHandler(async (req, res, next) => {
-    const { id } = req.params;
-    const { text } = req.body;
+const updateComment = asyncHandler(async (req, res) => {
+    const { commentId } = req.params;
+    const { content } = req.body;
 
-    if (!text) {
-        return next(new ApiError(400, 'Text field is required'));
-    }
-
-    const comment = await Comment.findByIdAndUpdate(id, { text }, { new: true });
-
+    const comment = await Comment.findById(commentId);
     if (!comment) {
-        return next(new ApiError(404, 'Comment not found'));
+        throw new ApiError(404, "Comment not found");
     }
 
-    res.status(200).json(new ApiResponse(200, comment, 'Comment updated successfully'));
+    if (comment.owner.toString() !== req.user?._id.toString()) {
+        throw new ApiError(403, "Unauthorized to update this comment");
+    }
+
+    if (!content) {
+        throw new ApiError(400, "Content is required");
+    }
+
+    const updatedComment = await Comment.findByIdAndUpdate(
+        commentId,
+        { $set: { content } },
+        { new: true }
+    ).select("-password -owner -video");
+
+    return res.status(200).json(new ApiResponse(200, updatedComment, "Comment updated successfully"));
 });
 
-// Delete a comment
-const deleteComment = asyncHandler(async (req, res, next) => {
-    const { id } = req.params;
+const deleteComment = asyncHandler(async (req, res) => {
+    const { deletecomment } = req.params;
 
-    const comment = await Comment.findByIdAndDelete(id);
-
+    const comment = await Comment.findById(deletecomment);
     if (!comment) {
-        return next(new ApiError(404, 'Comment not found'));
+        throw new ApiError(404, "Comment not found");
     }
 
-    res.status(200).json(new ApiResponse(200, null, 'Comment deleted successfully'));
+    if (comment.owner.toString() !== req.user?._id.toString()) {
+        throw new ApiError(403, "Only the comment owner can delete their comment");
+    }
+
+    await Comment.findByIdAndDelete(deletecomment);
+    await Like.deleteMany({ comment: deletecomment });
+
+    return res.status(200).json(new ApiResponse(200, {}, "Comment deleted successfully"));
 });
 
-export {
-    getVideoComments,
-    addComment,
-    updateComment,
-    deleteComment
-};
+export { getVideoComments, addComment, updateComment, deleteComment };
